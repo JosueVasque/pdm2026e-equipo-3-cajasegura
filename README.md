@@ -38,3 +38,10 @@ retiro es seguro y protege la reserva de insumos.
 Nadie trabaja directamente en `main`. El flujo es:
 
 `issue` → `rama` → `pull request` → `revisión` → `merge`
+
+## Cómo correr el proyecto
+
+```bash
+flutter pub get
+flutter run
+```
