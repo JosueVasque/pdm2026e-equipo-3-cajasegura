@@ -33,6 +33,11 @@ retiro es seguro y protege la reserva de insumos.
 | QA / Release | @MarioFernandoGuzman |
 | Apoyo general | @ethanrestrada |
 
+202308030
+202308046
+202308067
+202308049
+202308079
 ## Flujo de contribución
 
 Nadie trabaja directamente en `main`. El flujo es:
