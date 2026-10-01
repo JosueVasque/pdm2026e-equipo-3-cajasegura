@@ -163,3 +163,17 @@ Nadie trabaja directamente en `main`. El flujo es:
 flutter pub get
 flutter run
 ```
+
+
+
+
+## Roles (Semana )
+
+| Rol | Responsabilidad | Integrante |
+|---|---|---|
+| Arquitectura | Repositorio, ramas e integración | @Sebasorozc0 |
+| Producto / PM | Alcance, prioridad y criterios | @JohanRRod |
+| UX | Interfaz y flujo de las pantallas | @MarioFernandoGuzman |
+| Investigación | Validación directa con el usuario (Maria) | @Ethan |
+| QA | Revisión de código contra criterios de aceptación | @FMarvin |
+| Release | Evidencia, merge y cierre de issues | @Yozue |
