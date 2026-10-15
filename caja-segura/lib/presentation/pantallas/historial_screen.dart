@@ -162,7 +162,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
                     : ListView.separated(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         itemCount: lista.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
+                        separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (_, i) => _FilaMovimiento(lista[i]),
                       ),
               ),
