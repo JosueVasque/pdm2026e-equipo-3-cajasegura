@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../data/repositorios/movimiento_repositorio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/modelos/movimiento.dart';
-import '../widgets/carga_datos.dart';
+import '../providers/historial_provider.dart';
 
 enum _FiltroTipo { todos, ingresos, gastos }
 
@@ -10,18 +10,14 @@ enum _FiltroAmbito { todos, empresa, personal }
 const _colorEmpresa = Colors.indigo;
 const _colorPersonal = Colors.deepOrange;
 
-class HistorialScreen extends StatefulWidget {
-  const HistorialScreen({super.key, this.repositorio});
-
-  final MovimientoRepositorio? repositorio;
+class HistorialScreen extends ConsumerStatefulWidget {
+  const HistorialScreen({super.key});
 
   @override
-  State<HistorialScreen> createState() => _HistorialScreenState();
+  ConsumerState<HistorialScreen> createState() => _HistorialScreenState();
 }
 
-class _HistorialScreenState extends State<HistorialScreen> {
-  late final _repositorio = widget.repositorio ?? MovimientoRepositorio();
-  late Future<List<Movimiento>> _historial = _repositorio.obtenerHistorial();
+class _HistorialScreenState extends ConsumerState<HistorialScreen> {
   _FiltroTipo _filtroTipo = _FiltroTipo.todos;
   _FiltroAmbito _filtroAmbito = _FiltroAmbito.todos;
 
@@ -64,16 +60,24 @@ class _HistorialScreenState extends State<HistorialScreen> {
     }
   }
 
+  /// Descarta el resultado anterior (el error) y vuelve a pedir el historial.
+  void _reintentar() => ref.invalidate(historialProvider);
+
   @override
   Widget build(BuildContext context) {
+    final historial = ref.watch(historialProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Historial')),
-      body: CargaDatos<List<Movimiento>>(
-        future: _historial,
-        onReintentar: () => setState(() {
-          _historial = _repositorio.obtenerHistorial();
-        }),
-        builder: (movimientos) {
+      // Los 4 estados: cargando, error (con Reintentar), vacío y datos.
+      body: historial.when(
+        // Al reintentar, mostrar otra vez el indicador de carga.
+        skipLoadingOnRefresh: false,
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, _) => _EstadoError(onReintentar: _reintentar),
+        data: (movimientos) {
+          if (movimientos.isEmpty) return const _EstadoVacio();
+
           final porAmbito = _porAmbito(movimientos);
           final lista = _filtrados(porAmbito);
           return Column(
@@ -169,6 +173,64 @@ class _HistorialScreenState extends State<HistorialScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Estado de error: mensaje entendible y un botón para volver a intentar.
+class _EstadoError extends StatelessWidget {
+  const _EstadoError({required this.onReintentar});
+
+  final VoidCallback onReintentar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 12),
+            const Text('No se pudo cargar el historial.'),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: onReintentar,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Estado vacío: todavía no hay movimientos guardados en el teléfono.
+class _EstadoVacio extends StatelessWidget {
+  const _EstadoVacio();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.receipt_long, size: 48),
+            const SizedBox(height: 12),
+            const Text('Todavía no hay movimientos registrados.'),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => Navigator.maybePop(context),
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Ir a mi caja'),
+            ),
+          ],
+        ),
       ),
     );
   }
