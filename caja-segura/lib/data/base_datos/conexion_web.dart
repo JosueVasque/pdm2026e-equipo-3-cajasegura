@@ -5,4 +5,3 @@ DatabaseFactory get factoryLocal => databaseFactoryFfiWeb;
 
 // Es un nombre dentro del almacenamiento del navegador, no una ruta del SO.
 Future<String> rutaLocal(DatabaseFactory factory) async => 'caja_segura.db';
-
