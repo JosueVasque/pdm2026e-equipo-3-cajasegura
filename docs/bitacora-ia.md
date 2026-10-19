@@ -17,6 +17,24 @@ qué especificaste, qué revisaste y qué rechazaste.
 
 ---
 
+## 2026-10-18 · @JosueVasque (pantalla de la pareja @FMarvin y @JohanRRod) — estados de Caja del Negocio
+
+- **Herramienta:** Claude.
+- **Especificación:** "Aplicar a Caja del Negocio el mismo patrón de Historial: repositorio y lectura como
+  providers, `AsyncValue.when` con los 4 estados y prueba de widget del estado de error con `overrides`."
+- **Resultado:** `caja_provider.dart`, la pantalla con los 4 estados y las pruebas en `widget_test.dart`.
+- **Aceptado:** reutilizar el `ProviderScope` sin reintento que ya estaba en `main.dart` (no se volvió a
+  agregar `flutter_riverpod`) y `ref.invalidate(cajaProvider)` en Reintentar y al volver del retiro.
+- **Rechazado / corregido:**
+  - La caja no es una lista, así que "vacío" se definió como caja sin efectivo (`efectivoTotal <= 0`);
+    la acción lleva al historial, que ya existía (no se agregaron funciones nuevas).
+  - El botón Reintentar vive dentro de `_EstadoError` como `ConsumerWidget` en lugar de recibir un
+    callback, para que la línea del `when` quede corta y legible.
+- **Verificación:** <!-- completar: check del PR y prueba en Edge/emulador -->
+- **Commit / PR:** <!-- completar con el enlace al PR -->
+
+---
+
 ## 2026-10-15 · @JosueVasque y @ethanrestrada — estados de la pantalla Historial
 
 - **Herramienta:** Claude.
