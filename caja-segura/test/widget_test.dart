@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:caja_segura/data/repositorios/caja_repositorio.dart';
 import 'package:caja_segura/domain/modelos/caja.dart';
 import 'package:caja_segura/presentation/pantallas/caja_negocio_screen.dart';
+import 'package:caja_segura/presentation/providers/caja_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _CajaPrueba extends CajaRepositorio {
@@ -14,13 +16,19 @@ class _CajaPrueba extends CajaRepositorio {
   Future<Caja> obtenerCaja() => cargar();
 }
 
+/// Pantalla de la caja con el repositorio sobrescrito y sin reintento
+/// automático de Riverpod 3 (igual que en main.dart).
+Widget _cajaCon(CajaRepositorio repositorio) => ProviderScope(
+  retry: (_, _) => null,
+  overrides: [cajaRepositorioProvider.overrideWithValue(repositorio)],
+  child: const MaterialApp(home: CajaNegocioScreen()),
+);
+
 void main() {
   testWidgets('carga caja y verifica el retiro con los datos obtenidos', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      MaterialApp(home: CajaNegocioScreen(repositorio: _CajaPrueba())),
-    );
+    await tester.pumpWidget(_cajaCon(_CajaPrueba()));
     await tester.pumpAndSettle();
     expect(find.text('Q2500.00'), findsOneWidget);
     expect(find.text('Q1200.00'), findsOneWidget);
@@ -34,25 +42,36 @@ void main() {
     expect(find.text('Q2000.00'), findsOneWidget);
   });
 
-  testWidgets('muestra carga y permite reintentar una lectura fallida', (
-    tester,
-  ) async {
+  testWidgets('estado de carga y de error con Reintentar', (tester) async {
     final pendiente = Completer<Caja>();
     final repositorio = _CajaPrueba()..cargar = () => pendiente.future;
-    await tester.pumpWidget(
-      MaterialApp(home: CajaNegocioScreen(repositorio: repositorio)),
-    );
+    await tester.pumpWidget(_cajaCon(repositorio));
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
     pendiente.completeError(StateError('No se pudo abrir SQLite'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('No se pudieron cargar los datos guardados.'),
-      findsOneWidget,
-    );
+    expect(find.text('No se pudo cargar la caja.'), findsOneWidget);
+    expect(find.text('Reintentar'), findsOneWidget);
+
+    // El botón debe volver a pedir los datos, no solo existir.
     repositorio.cargar = () async =>
         const Caja(efectivoTotal: 100, reservaInsumos: 50);
     await tester.tap(find.text('Reintentar'));
     await tester.pumpAndSettle();
+    expect(find.text('No se pudo cargar la caja.'), findsNothing);
     expect(find.text('Q100.00'), findsOneWidget);
+  });
+
+  testWidgets('estado vacío cuando la caja no tiene efectivo', (tester) async {
+    const vacia = Caja(efectivoTotal: 0, reservaInsumos: 0);
+    final repositorio = _CajaPrueba()..cargar = () async => vacia;
+    await tester.pumpWidget(_cajaCon(repositorio));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Todavía no hay efectivo registrado en la caja.'),
+      findsOneWidget,
+    );
+    expect(find.text('Ver historial'), findsOneWidget);
   });
 }
