@@ -43,7 +43,7 @@ void main() {
     await tester.tap(find.text('Ver historial'));
     await tester.pumpAndSettle();
     expect(find.text('Ir a mi caja'), findsOneWidget);
-    await tester.tap(find.text('Ir a mi caja'));
+    await tester.tap(find.text('Inicio'));
     await tester.pumpAndSettle();
     expect(find.text('Caja disponible'), findsOneWidget);
     await tester.tap(find.text('Ajustes'));
