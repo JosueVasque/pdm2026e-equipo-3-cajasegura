@@ -16,6 +16,18 @@ class _MovimientosPrueba extends MovimientoRepositorio {
 
   @override
   Future<List<Movimiento>> obtenerHistorial() => cargar();
+
+  @override
+  Future<void> eliminarMovimiento(String id) async {
+    final lista = await cargar();
+    cargar = () async => lista.where((m) => m.id != id).toList();
+  }
+
+  @override
+  Future<void> registrarMovimiento(Movimiento movimiento) async {
+    final lista = await cargar();
+    cargar = () async => [...lista, movimiento];
+  }
 }
 
 final _movimientos = [
@@ -108,4 +120,38 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('No hay movimientos para mostrar'), findsOneWidget);
   });
+  testWidgets('borrar y deshacer conserva el movimiento completo', (
+    tester,
+  ) async {
+    final repositorio = _MovimientosPrueba(() async => List.of(_movimientos));
+    await tester.pumpWidget(_historialCon(repositorio));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byKey(const ValueKey('1')), const Offset(-600, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Venta'), findsNothing);
+    expect((await repositorio.obtenerHistorial()).map((m) => m.id), ['2']);
+    await tester.tap(find.text('Deshacer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Venta'), findsOneWidget);
+    final restaurado = (await repositorio.obtenerHistorial()).last;
+    expect(identical(restaurado, _movimientos.first), isTrue);
+  });
+
+  testWidgets('si SQLite falla la fila permanece', (tester) async {
+    await tester.pumpWidget(
+      _historialCon(_FallaBorrado(() async => _movimientos)),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byKey(const ValueKey('1')), const Offset(-600, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Venta'), findsOneWidget);
+    expect(find.text('No se pudo borrar el movimiento.'), findsOneWidget);
+  });
+}
+
+class _FallaBorrado extends _MovimientosPrueba {
+  _FallaBorrado(super.cargar);
+  @override
+  Future<void> eliminarMovimiento(String id) async =>
+      throw StateError('SQLite');
 }
