@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/modelos/caja.dart';
 import '../providers/caja_provider.dart';
-import 'historial_screen.dart';
+import '../providers/navegacion_provider.dart';
 import 'retiro_personal_screen.dart';
 
 class CajaNegocioScreen extends ConsumerWidget {
@@ -60,11 +60,11 @@ class _EstadoError extends ConsumerWidget {
 }
 
 /// Estado vacío: la caja todavía no tiene efectivo registrado.
-class _EstadoVacio extends StatelessWidget {
+class _EstadoVacio extends ConsumerWidget {
   const _EstadoVacio();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -76,10 +76,7 @@ class _EstadoVacio extends StatelessWidget {
             const Text('Todavía no hay efectivo registrado en la caja.'),
             const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const HistorialScreen()),
-              ),
+              onPressed: () => ref.read(navegacionProvider.notifier).cambiar(1),
               icon: const Icon(Icons.history),
               label: const Text('Ver historial'),
             ),
@@ -98,60 +95,52 @@ class _ResumenCaja extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
+    return ListView(
       padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _TarjetaMonto(
-            titulo: 'Caja disponible',
-            monto: caja.efectivoTotal,
-            color: Colors.teal,
+      children: [
+        _TarjetaMonto(
+          titulo: 'Caja disponible',
+          monto: caja.efectivoTotal,
+          color: Colors.teal,
+        ),
+        const SizedBox(height: 16),
+        _TarjetaMonto(
+          titulo: 'Reserva protegida para insumos',
+          monto: caja.reservaInsumos,
+          color: Colors.orange,
+        ),
+        const SizedBox(height: 16),
+        _TarjetaMonto(
+          titulo: 'Disponible para tu sueldo',
+          monto: caja.disponibleParaSueldo,
+          color: Colors.green,
+        ),
+        const SizedBox(height: 24),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
           ),
-          const SizedBox(height: 16),
-          _TarjetaMonto(
-            titulo: 'Reserva protegida para insumos',
-            monto: caja.reservaInsumos,
-            color: Colors.orange,
+          icon: const Icon(Icons.history),
+          label: const Text('Ver historial'),
+          onPressed: () => ref.read(navegacionProvider.notifier).cambiar(1),
+        ),
+        const SizedBox(height: 12),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
           ),
-          const SizedBox(height: 16),
-          _TarjetaMonto(
-            titulo: 'Disponible para tu sueldo',
-            monto: caja.disponibleParaSueldo,
-            color: Colors.green,
-          ),
-          const Spacer(),
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            icon: const Icon(Icons.history),
-            label: const Text('Ver historial'),
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const HistorialScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => RetiroPersonalScreen(caja: caja),
-                ),
-              );
-              if (context.mounted) ref.invalidate(cajaProvider);
-            },
-            child: const Text('Retirar mi sueldo'),
-          ),
-        ],
-      ),
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RetiroPersonalScreen(caja: caja),
+              ),
+            );
+            if (context.mounted) ref.invalidate(cajaProvider);
+          },
+          child: const Text('Retirar mi sueldo'),
+        ),
+      ],
     );
   }
 }

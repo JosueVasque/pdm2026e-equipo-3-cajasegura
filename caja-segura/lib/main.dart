@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'presentation/pantallas/caja_negocio_screen.dart';
+import 'presentation/pantallas/principal_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +18,7 @@ class MiApp extends StatelessWidget {
       title: 'Caja Segura',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
-      home: const CajaNegocioScreen(),
+      home: const PrincipalScreen(),
     );
   }
 }
