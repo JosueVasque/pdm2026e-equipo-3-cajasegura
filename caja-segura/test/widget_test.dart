@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:caja_segura/main.dart';
+import 'package:caja_segura/presentation/providers/historial_provider.dart';
 
 import 'package:caja_segura/data/repositorios/caja_repositorio.dart';
 import 'package:caja_segura/domain/modelos/caja.dart';
@@ -25,6 +27,36 @@ Widget _cajaCon(CajaRepositorio repositorio) => ProviderScope(
 );
 
 void main() {
+  testWidgets('barra y Ver historial cambian de pestaña', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: [
+          cajaRepositorioProvider.overrideWithValue(_CajaPrueba()),
+          historialProvider.overrideWith((ref) async => []),
+        ],
+        child: const MiApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Ver historial'));
+    await tester.tap(find.text('Ver historial'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ir a mi caja'), findsOneWidget);
+    await tester.tap(find.text('Ir a mi caja'));
+    await tester.pumpAndSettle();
+    expect(find.text('Caja disponible'), findsOneWidget);
+    await tester.tap(find.text('Ajustes'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ajustes: Próximamente'), findsOneWidget);
+    await tester.tap(find.text('Historial').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Ir a mi caja'), findsOneWidget);
+    await tester.tap(find.text('Inicio'));
+    await tester.pumpAndSettle();
+    expect(find.text('Caja disponible'), findsOneWidget);
+  });
+
   testWidgets('carga caja y verifica el retiro con los datos obtenidos', (
     tester,
   ) async {
@@ -33,6 +65,7 @@ void main() {
     expect(find.text('Q2500.00'), findsOneWidget);
     expect(find.text('Q1200.00'), findsOneWidget);
     expect(find.text('Q1300.00'), findsOneWidget);
+    await tester.ensureVisible(find.text('Retirar mi sueldo'));
     await tester.tap(find.text('Retirar mi sueldo'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '500');
