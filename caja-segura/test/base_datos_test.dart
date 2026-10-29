@@ -30,6 +30,31 @@ void main() {
     await directorio.delete(recursive: true);
   });
 
+  test('borrar y restaurar persisten al reabrir SQLite', () async {
+    final original = (await movimientos.obtenerHistorial()).first;
+    final ruta = (await base.database).path;
+    await movimientos.eliminarMovimiento(original.id);
+    await base.cerrar();
+    base = BaseDatosLocal(factory: databaseFactoryFfi, ruta: ruta);
+    movimientos = MovimientoRepositorio(baseDatos: base);
+    expect(
+      (await movimientos.obtenerHistorial()).any((m) => m.id == original.id),
+      isFalse,
+    );
+    await movimientos.registrarMovimiento(original);
+    await base.cerrar();
+    base = BaseDatosLocal(factory: databaseFactoryFfi, ruta: ruta);
+    movimientos = MovimientoRepositorio(baseDatos: base);
+    final restaurado = (await movimientos.obtenerHistorial()).firstWhere(
+      (m) => m.id == original.id,
+    );
+    expect(restaurado.descripcion, original.descripcion);
+    expect(restaurado.monto, original.monto);
+    expect(restaurado.fecha, original.fecha);
+    expect(restaurado.tipo, original.tipo);
+    expect(restaurado.ambito, original.ambito);
+  });
+
   test('crea la caja y el historial en una conexión compartida', () async {
     final resultados = await Future.wait<Object>([
       cajas.obtenerCaja(),

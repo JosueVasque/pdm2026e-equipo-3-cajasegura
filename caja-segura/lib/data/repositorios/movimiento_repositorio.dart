@@ -14,6 +14,11 @@ class MovimientoRepositorio {
     return filas.map(movimientoDesdeFila).toList();
   }
 
+  Future<void> eliminarMovimiento(String id) async {
+    final db = await _baseDatos.database;
+    await db.delete('movimientos', where: 'id = ?', whereArgs: [id]);
+  }
+
   /// Guarda un registro del historial; no modifica el saldo de caja.
   Future<void> registrarMovimiento(Movimiento movimiento) async {
     final fila = movimientoAFila(movimiento);
