@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/modelos/movimiento.dart';
 import '../providers/historial_provider.dart';
+import '../providers/navegacion_provider.dart';
 
 enum _FiltroTipo { todos, ingresos, gastos }
 
@@ -18,31 +19,71 @@ class HistorialScreen extends ConsumerStatefulWidget {
 }
 
 class _HistorialScreenState extends ConsumerState<HistorialScreen> {
-  _FiltroTipo _filtroTipo = _FiltroTipo.todos;
-  _FiltroAmbito _filtroAmbito = _FiltroAmbito.todos;
-
-  /// Movimientos del ámbito elegido (base para los totales).
-  List<Movimiento> _porAmbito(List<Movimiento> movimientos) {
-    switch (_filtroAmbito) {
-      case _FiltroAmbito.empresa:
-        return movimientos.where((m) => m.esEmpresa).toList();
-      case _FiltroAmbito.personal:
-        return movimientos.where((m) => !m.esEmpresa).toList();
-      case _FiltroAmbito.todos:
-        return movimientos;
-    }
+  _FiltroTipo get _filtroTipo =>
+      switch (ref.read(filtroHistorialProvider).tipo) {
+        TipoMovimiento.ingreso => _FiltroTipo.ingresos,
+        TipoMovimiento.gasto => _FiltroTipo.gastos,
+        null => _FiltroTipo.todos,
+      };
+  _FiltroAmbito get _filtroAmbito =>
+      switch (ref.read(filtroHistorialProvider).ambito) {
+        AmbitoMovimiento.empresa => _FiltroAmbito.empresa,
+        AmbitoMovimiento.personal => _FiltroAmbito.personal,
+        null => _FiltroAmbito.todos,
+      };
+  void _cambiar({_FiltroTipo? tipo, _FiltroAmbito? ambito}) {
+    final t = tipo ?? _filtroTipo;
+    final a = ambito ?? _filtroAmbito;
+    ref
+        .read(filtroHistorialProvider.notifier)
+        .cambiar(
+          FiltroHistorial(
+            tipo: t == _FiltroTipo.todos
+                ? null
+                : TipoMovimiento.values[t.index - 1],
+            ambito: a == _FiltroAmbito.todos
+                ? null
+                : AmbitoMovimiento.values[a.index - 1],
+          ),
+        );
   }
 
-  /// Movimientos del ámbito elegido y del tipo elegido (la lista visible).
-  List<Movimiento> _filtrados(List<Movimiento> movimientos) {
-    switch (_filtroTipo) {
-      case _FiltroTipo.ingresos:
-        return movimientos.where((m) => m.esIngreso).toList();
-      case _FiltroTipo.gastos:
-        return movimientos.where((m) => !m.esIngreso).toList();
-      case _FiltroTipo.todos:
-        return movimientos;
+  Future<bool> _borrar(Movimiento movimiento) async {
+    final repositorio = ref.read(movimientoRepositorioProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      // confirmDismiss espera a SQLite: si falla, la fila sigue visible.
+      await repositorio.eliminarMovimiento(movimiento.id);
+    } catch (_) {
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('No se pudo borrar el movimiento.')),
+        );
+      }
+      return false;
     }
+    if (!mounted) return false;
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Movimiento eliminado'),
+        action: SnackBarAction(
+          label: 'Deshacer',
+          onPressed: () async {
+            try {
+              await repositorio.registrarMovimiento(movimiento);
+              if (mounted) ref.invalidate(historialProvider);
+            } catch (_) {
+              messenger.showSnackBar(
+                const SnackBar(
+                  content: Text('No se pudo restaurar el movimiento.'),
+                ),
+              );
+            }
+          },
+        ),
+      ),
+    );
+    return true;
   }
 
   double _total(List<Movimiento> movimientos, bool ingresos) => movimientos
@@ -65,6 +106,7 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(filtroHistorialProvider);
     final historial = ref.watch(historialProvider);
 
     return Scaffold(
@@ -76,10 +118,14 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => _EstadoError(onReintentar: _reintentar),
         data: (movimientos) {
-          if (movimientos.isEmpty) return const _EstadoVacio();
+          if (movimientos.isEmpty &&
+              _filtroTipo == _FiltroTipo.todos &&
+              _filtroAmbito == _FiltroAmbito.todos) {
+            return const _EstadoVacio();
+          }
 
-          final porAmbito = _porAmbito(movimientos);
-          final lista = _filtrados(porAmbito);
+          final porAmbito = movimientos;
+          final lista = movimientos;
           return Column(
             children: [
               Padding(
@@ -112,23 +158,21 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
                     ChoiceChip(
                       label: const Text('Todo'),
                       selected: _filtroAmbito == _FiltroAmbito.todos,
-                      onSelected: (_) =>
-                          setState(() => _filtroAmbito = _FiltroAmbito.todos),
+                      onSelected: (_) => _cambiar(ambito: _FiltroAmbito.todos),
                     ),
                     ChoiceChip(
                       avatar: const Icon(Icons.storefront, size: 18),
                       label: const Text('Empresa'),
                       selected: _filtroAmbito == _FiltroAmbito.empresa,
                       onSelected: (_) =>
-                          setState(() => _filtroAmbito = _FiltroAmbito.empresa),
+                          _cambiar(ambito: _FiltroAmbito.empresa),
                     ),
                     ChoiceChip(
                       avatar: const Icon(Icons.person, size: 18),
                       label: const Text('Personal'),
                       selected: _filtroAmbito == _FiltroAmbito.personal,
-                      onSelected: (_) => setState(
-                        () => _filtroAmbito = _FiltroAmbito.personal,
-                      ),
+                      onSelected: (_) =>
+                          _cambiar(ambito: _FiltroAmbito.personal),
                     ),
                   ],
                 ),
@@ -154,8 +198,7 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
                     ),
                   ],
                   selected: {_filtroTipo},
-                  onSelectionChanged: (s) =>
-                      setState(() => _filtroTipo = s.first),
+                  onSelectionChanged: (s) => _cambiar(tipo: s.first),
                 ),
               ),
               Expanded(
@@ -167,7 +210,22 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         itemCount: lista.length,
                         separatorBuilder: (_, _) => const Divider(height: 1),
-                        itemBuilder: (_, i) => _FilaMovimiento(lista[i]),
+                        itemBuilder: (_, i) => Dismissible(
+                          key: ValueKey(lista[i].id),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            color: Colors.red,
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.all(16),
+                            child: const Icon(
+                              Icons.delete,
+                              color: Colors.white,
+                            ),
+                          ),
+                          confirmDismiss: (_) => _borrar(lista[i]),
+                          onDismissed: (_) => ref.invalidate(historialProvider),
+                          child: _FilaMovimiento(lista[i]),
+                        ),
                       ),
               ),
             ],
@@ -209,11 +267,11 @@ class _EstadoError extends StatelessWidget {
 }
 
 /// Estado vacío: todavía no hay movimientos guardados en el teléfono.
-class _EstadoVacio extends StatelessWidget {
+class _EstadoVacio extends ConsumerWidget {
   const _EstadoVacio();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -225,7 +283,7 @@ class _EstadoVacio extends StatelessWidget {
             const Text('Todavía no hay movimientos registrados.'),
             const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: () => Navigator.maybePop(context),
+              onPressed: () => ref.read(navegacionProvider.notifier).cambiar(0),
               icon: const Icon(Icons.arrow_back),
               label: const Text('Ir a mi caja'),
             ),

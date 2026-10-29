@@ -12,5 +12,34 @@ final movimientoRepositorioProvider = Provider<MovimientoRepositorio>((ref) {
 /// Historial leído de la base local. La pantalla lo consume como `AsyncValue`
 /// (cargando, error o datos) y lo vuelve a pedir con `ref.invalidate`.
 final historialProvider = FutureProvider.autoDispose<List<Movimiento>>((ref) {
-  return ref.watch(movimientoRepositorioProvider).obtenerHistorial();
+  final filtro = ref.watch(filtroHistorialProvider);
+  return ref
+      .watch(movimientoRepositorioProvider)
+      .obtenerHistorial()
+      .then(
+        (lista) => lista
+            .where(
+              (m) =>
+                  (filtro.tipo == null || m.tipo == filtro.tipo) &&
+                  (filtro.ambito == null || m.ambito == filtro.ambito),
+            )
+            .toList(),
+      );
 });
+
+class FiltroHistorial {
+  final TipoMovimiento? tipo;
+  final AmbitoMovimiento? ambito;
+  const FiltroHistorial({this.tipo, this.ambito});
+}
+
+class FiltroHistorialNotifier extends Notifier<FiltroHistorial> {
+  @override
+  FiltroHistorial build() => const FiltroHistorial();
+  void cambiar(FiltroHistorial filtro) => state = filtro;
+}
+
+final filtroHistorialProvider =
+    NotifierProvider<FiltroHistorialNotifier, FiltroHistorial>(
+      FiltroHistorialNotifier.new,
+    );
