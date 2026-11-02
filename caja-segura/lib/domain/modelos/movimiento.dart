@@ -1,6 +1,5 @@
 enum TipoMovimiento { ingreso, gasto }
 
-/// A quién pertenece el movimiento: al negocio o a las finanzas personales.
 enum AmbitoMovimiento { empresa, personal }
 
 class Movimiento {
@@ -10,6 +9,7 @@ class Movimiento {
   final TipoMovimiento tipo;
   final AmbitoMovimiento ambito;
   final DateTime fecha;
+  final int? categoriaId;
 
   const Movimiento({
     required this.id,
@@ -18,6 +18,7 @@ class Movimiento {
     required this.tipo,
     required this.ambito,
     required this.fecha,
+    this.categoriaId,
   });
 
   bool get esIngreso => tipo == TipoMovimiento.ingreso;

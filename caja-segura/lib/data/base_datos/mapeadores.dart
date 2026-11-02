@@ -21,6 +21,7 @@ Caja cajaDesdeFila(Map<String, Object?> fila) => Caja(
 
 Map<String, Object?> movimientoAFila(Movimiento movimiento) {
   final centavos = aCentavos(movimiento.monto);
+
   if (movimiento.id.trim().isEmpty ||
       movimiento.descripcion.trim().isEmpty ||
       centavos == 0) {
@@ -28,6 +29,7 @@ Map<String, Object?> movimientoAFila(Movimiento movimiento) {
       'El movimiento requiere id, descripción y monto positivo',
     );
   }
+
   return {
     'id': movimiento.id,
     'descripcion': movimiento.descripcion,
@@ -35,6 +37,7 @@ Map<String, Object?> movimientoAFila(Movimiento movimiento) {
     'tipo': movimiento.tipo.name,
     'ambito': movimiento.ambito.name,
     'fecha': movimiento.fecha.millisecondsSinceEpoch,
+    'categoria_id': movimiento.categoriaId,
   };
 }
 
@@ -45,4 +48,5 @@ Movimiento movimientoDesdeFila(Map<String, Object?> fila) => Movimiento(
   tipo: TipoMovimiento.values.byName(fila['tipo'] as String),
   ambito: AmbitoMovimiento.values.byName(fila['ambito'] as String),
   fecha: DateTime.fromMillisecondsSinceEpoch(fila['fecha'] as int),
+  categoriaId: fila['categoria_id'] as int?,
 );
