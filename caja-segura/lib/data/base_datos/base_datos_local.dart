@@ -31,7 +31,10 @@ class BaseDatosLocal {
     return factorySeleccionada.openDatabase(
       rutaArchivo,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 3,
+        onConfigure: (db) async {
+          await db.execute('PRAGMA foreign_keys = ON');
+        },
         onCreate: (db, version) async {
           // Los importes se guardan en centavos para evitar redondeos de REAL.
           await db.execute('''
@@ -48,13 +51,42 @@ class BaseDatosLocal {
               monto_centavos INTEGER NOT NULL CHECK (monto_centavos > 0),
               tipo TEXT NOT NULL CHECK (tipo IN ('ingreso', 'gasto')),
               ambito TEXT NOT NULL CHECK (ambito IN ('empresa', 'personal')),
-              fecha INTEGER NOT NULL
+              fecha INTEGER NOT NULL,
+              categoria_id INTEGER REFERENCES categorias(id) ON DELETE RESTRICT
             )
           ''');
           await db.execute(
             'CREATE INDEX movimientos_fecha ON movimientos (fecha DESC)',
           );
+          await db.execute('''
+  CREATE TABLE categorias (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    archivada INTEGER NOT NULL DEFAULT 0
+      CHECK (archivada IN (0, 1))
+  )
+''');
           await cargarDatosIniciales(db);
+        },
+        onUpgrade: (db, versionAnterior, versionNueva) async {
+          if (versionAnterior < 2) {
+            await db.execute('''
+      CREATE TABLE categorias (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        archivada INTEGER NOT NULL DEFAULT 0
+          CHECK (archivada IN (0, 1))
+      )
+    ''');
+          }
+
+          if (versionAnterior < 3) {
+            await db.execute('''
+      ALTER TABLE movimientos
+      ADD COLUMN categoria_id INTEGER
+      REFERENCES categorias(id) ON DELETE RESTRICT
+    ''');
+          }
         },
       ),
     );

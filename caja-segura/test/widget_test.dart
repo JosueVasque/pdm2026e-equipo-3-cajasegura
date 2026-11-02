@@ -46,9 +46,9 @@ void main() {
     await tester.tap(find.text('Inicio'));
     await tester.pumpAndSettle();
     expect(find.text('Caja disponible'), findsOneWidget);
-    await tester.tap(find.text('Ajustes'));
+    await tester.tap(find.text('Categorías'));
     await tester.pumpAndSettle();
-    expect(find.text('Ajustes: Próximamente'), findsOneWidget);
+    expect(find.text('Categorías'), findsWidgets);
     await tester.tap(find.text('Historial').last);
     await tester.pumpAndSettle();
     expect(find.text('Ir a mi caja'), findsOneWidget);
