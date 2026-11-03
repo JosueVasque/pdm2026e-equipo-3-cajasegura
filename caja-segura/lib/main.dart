@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'presentation/pantallas/principal_screen.dart';
+import 'presentation/tema/caja_estilo.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +18,16 @@ class MiApp extends StatelessWidget {
     return MaterialApp(
       title: 'Caja Segura',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
+      theme: CajaEstilo.tema,
+      builder: (context, child) => ColoredBox(
+        color: const Color(0xFFE3E9E5),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: child,
+          ),
+        ),
+      ),
       home: const PrincipalScreen(),
     );
   }

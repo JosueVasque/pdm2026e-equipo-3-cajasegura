@@ -34,7 +34,7 @@ retiro es seguro y protege la reserva de insumos.
 3. Confirmación de si el retiro es seguro / impacto en caja.
 
 ### No entra todavía
-1. Pantalla de "Retiro exitoso".
+1. Pantalla independiente de "Retiro exitoso" (la confirmación ya muestra un aviso).
 2. Pantalla de ajuste ante riesgo de descapitalización.
 3. Sincronización con un servidor o base de datos remota.
 
@@ -177,7 +177,7 @@ flutter run
 
 La aplicación crea automáticamente `caja_segura.db` al consultar los datos por
 primera vez. No requiere servidor, credenciales ni conexión a Internet durante
-su uso. La conexión compartida y la versión del esquema (actualmente 1) están en
+su uso. La conexión compartida y la versión del esquema (actualmente 6) están en
 `lib/data/base_datos/base_datos_local.dart`. Los cambios futuros de esquema deben
 incrementar esa versión y agregar una migración `onUpgrade` que conserve los datos.
 
@@ -187,6 +187,7 @@ incrementar esa versión y agregar una migración `onUpgrade` que conserve los d
 |---|---|
 | `caja` | Un registro con efectivo total y reserva de insumos. |
 | `movimientos` | ID, descripción, monto, tipo (ingreso/gasto), ámbito (empresa/personal) y fecha. |
+| `categorias` | Nombre único e indicador de archivo; los movimientos pueden tener una categoría opcional. |
 
 Los importes se almacenan como enteros en centavos y se convierten a los modelos
 de dominio en `mapeadores.dart`. Las fechas se guardan como milisegundos desde
@@ -203,13 +204,131 @@ demostración y no se calcula sumando esos ocho movimientos.
 - `CajaRepositorio.obtenerCaja()` consulta la caja y `guardarCaja(caja)` permite
   actualizar sus importes de manera persistente.
 - `MovimientoRepositorio.obtenerHistorial()` consulta los movimientos y
-  `registrarMovimiento(movimiento)` inserta un registro; un ID duplicado genera
-  un error y no reemplaza el existente. Esta operación no modifica el saldo.
+  `registrarMovimiento(movimiento)` registra y actualiza el saldo en una única
+  transacción. Los ingresos de empresa suman y los gastos de empresa restan;
+  los personales no afectan la caja. No se permite saldo negativo. Un ID
+  duplicado revierte toda la operación.
 - Las operaciones retornan `Future`. Caja e Historial muestran estados de carga
   y error con reintento, manteniendo los filtros existentes.
-- El flujo de retiro sigue siendo una **simulación**: verificar un monto no
-  modifica la caja ni registra movimientos. Aún no existe confirmación de retiro
-  ni formularios de edición de caja o alta de movimientos en la interfaz.
+- Verificar un retiro es una simulación; **Confirmar retiro** consulta de nuevo
+  el saldo y la reserva y registra un único gasto de empresa junto con el
+  descuento. Si afecta la reserva, se rechaza sin guardar cambios.
+- En Inicio, el lápiz permite editar efectivo y reserva, incluso con caja vacía.
+  Es una corrección directa del saldo, sin movimiento automático. La reserva
+  puede superar al efectivo: es una meta y lo disponible para sueldo será cero.
+- En Historial, **Registrar movimiento** pide descripción, monto positivo con
+  hasta dos decimales (punto o coma), tipo, ámbito, fecha y categoría opcional.
+  Los gastos normales de empresa pueden utilizar la reserva para insumos.
+- Tocar un movimiento permite asignar, cambiar o quitar su categoría. Las
+  archivadas se conservan en el historial pero no se asignan a otros movimientos.
+- Borrar un movimiento no conciliado revierte su efecto sobre la caja; Deshacer lo vuelve a aplicar.
+  Ambas operaciones son transaccionales. Si revertir un ingreso deja saldo
+  negativo, se conserva el movimiento y se informa el error.
+- La migración a v4 añade `impacto_caja_centavos` con valor cero para todos los
+  movimientos existentes. No recalcula ni modifica el saldo previo: el historial
+  de demostración siempre fue independiente de la caja inicial. Los movimientos
+  nuevos guardan su efecto real para poder borrarlos o restaurarlos correctamente.
+
+### Alertas de reserva y reportes
+
+- Inicio muestra **Reserva sin cubrir** con el faltante cuando el efectivo es
+  menor que la reserva, incluso con caja vacía. Si ambos importes son iguales y
+  la reserva es positiva, muestra **Sin margen para retiros**.
+- Al registrar un gasto de empresa, `registrarMovimientoConReserva` consulta el
+  saldo vigente dentro de la transacción. Si utiliza la reserva, solicita
+  confirmación antes de guardar. Cancelar no cambia los datos; confirmar permite
+  el gasto sin permitir saldo negativo. Los movimientos personales no disparan
+  esta advertencia. Son alertas dentro de la app, sin notificaciones del sistema.
+- La pestaña **Reportes** permite elegir Hoy, Esta semana (lunes a hoy), Este mes
+  (día 1 a hoy), Todo el historial o fechas personalizadas inclusivas. Usa la
+  fecha local del dispositivo. Empresa es el ámbito inicial; también permite
+  Personal o Empresa + personal.
+- Muestra ingresos, gastos, balance de movimientos y desglose por categoría.
+  Las barras y porcentajes representan la proporción de los gastos. Incluye
+  categorías archivadas y un grupo Sin categoría; no modifica datos ni saldos.
+- Los cálculos agregan centavos enteros. El balance no es ganancia ni saldo de
+  caja: incluye retiros como gastos y no incluye saldo inicial ni ajustes directos.
+- Los filtros operan en memoria, independientes de los del Historial. Registrar,
+  borrar, restaurar o reclasificar actualiza también los reportes. Actualizar y
+  Reintentar vuelven a consultar los datos. No se requiere migración adicional.
+
+### Fechas en el historial
+
+El Historial inicia en **Todo el historial**. El calendario permite elegir Hoy,
+Esta semana (desde lunes), Este mes (desde el día 1) o Elegir fechas. Ambos días
+del rango personalizado se incluyen completos, usando la fecha local. Los
+filtros de fecha, tipo y ámbito se combinan; los totales corresponden a esa misma
+selección. Limpiar filtros restablece los tres y muestra todos los movimientos.
+Cancelar el calendario conserva la selección anterior. Los controles se mantienen
+cuando el rango no tiene resultados. No se vuelve a consultar SQLite al filtrar.
+Estos filtros son independientes de los períodos seleccionados en Reportes.
+
+### Movimientos frecuentes, cierres y retiros de sueldo
+
+- **Movimientos frecuentes** está en Inicio y en el botón de rayo de Historial.
+  Permite crear, editar y eliminar plantillas con descripción, monto, tipo,
+  ámbito y categoría. También puedes guardar un movimiento normal del historial
+  como frecuente. Guardar la plantilla no mueve dinero; tocarla abre un registro
+  nuevo con fecha de hoy y datos editables. Las alertas de reserva siguen activas.
+- Si la categoría de una plantilla fue archivada, al usarla se muestra Sin
+  categoría. Si se elimina una categoría sin movimientos asociados, la plantilla
+  se conserva con categoría nula. Borrar una plantilla no borra movimientos.
+- **Cierre de caja** está en Inicio y en su menú Más opciones, incluso con caja
+  vacía. Ingresa el efectivo contado, revisa la diferencia y explica faltantes o
+  sobrantes. Puedes registrar una operación olvidada antes de confirmar.
+- Confirmar guarda fecha, saldo esperado, contado, reserva y explicación en
+  `cierres`, y ajusta la caja en una sola transacción. Si el saldo esperado cambió,
+  se pide revisar el nuevo saldo antes de confirmar otra vez. La reserva no cambia.
+  Un cierre sin diferencia admite nota opcional. Puedes seguir operando después.
+- Los cierres se consultan en un historial de solo lectura. Sus ajustes no crean
+  ingresos, gastos o retiros, por lo que no alteran los reportes de movimientos.
+- En **Reportes → Retiros de sueldo**, los mismos períodos permiten ver total,
+  cantidad y detalle de salidas de sueldo. El ámbito Empresa/Personal no se
+  aplica a este resumen: se cuentan solo salidas de empresa marcadas como retiro,
+  sin duplicar el ingreso personal del mismo traslado.
+- El esquema v5 añade `frecuentes`, `cierres` y `movimientos.es_retiro`. Los
+  retiros nuevos se marcan al confirmarlos. Para los datos previos se reconoce
+  el concepto exacto `Retiro de sueldo` como gasto de empresa, usado por el flujo
+  anterior y la demostración; los demás movimientos conservan su clasificación.
+  La migración no cambia saldos ni vuelve a insertar datos iniciales.
+
+### Protección de cierres y correcciones
+
+- Al confirmar un cierre, se conserva una copia de los movimientos existentes y
+  se vinculan al cierre dentro de la misma transacción. La protección se basa en
+  esa pertenencia, no en la fecha ingresada. Un registro creado posteriormente
+  con fecha anterior sigue sin conciliar hasta incluirlo en un nuevo cierre.
+- Los movimientos conciliados muestran un candado: no se pueden editar, cambiar
+  de categoría ni borrar. Las comprobaciones se ejecutan en el repositorio y
+  mediante restricciones en SQLite, incluso si el cierre ocurre mientras se
+  tiene abierto un formulario de corrección.
+- Antes de conciliar, se permite corregir monto, descripción, fecha, tipo, ámbito
+  y categoría con motivo obligatorio. Se comprueba que el original no haya
+  cambiado, se ajusta solo la diferencia de saldo y se guardan valores anteriores,
+  nuevos, fecha y motivo de forma atómica. Los retiros conservan su naturaleza y
+  no pueden corregirse aumentando el retiro por encima de la reserva disponible.
+- Los registros históricos de empresa cuyo efecto sobre caja era cero
+  conservan ese efecto cero al corregirse; no se recalcula el saldo inicial.
+- Después de conciliar, se puede registrar una aclaración sin cambio de saldo o
+  un ajuste nuevo de efectivo, siempre vinculado al original y con explicación.
+  Solo los movimientos de empresa admiten ajustes de caja. No se permite saldo
+  negativo y se solicita confirmación si se utiliza la reserva. El ajuste y su
+  efecto en caja se guardan juntos y no reescriben el movimiento ni el cierre.
+- Los ajustes de corrección se consultan en el detalle protegido y en Historial
+  → Trazabilidad. No se cuentan como ventas, gastos o retiros nuevos en Reportes.
+  El resumen de retiros conserva las salidas registradas, sin compensarlas ni
+  ocultarlas por ajustes posteriores.
+- Trazabilidad conserva también altas, retiros, borrados, Deshacer, cierres y
+  cambios manuales de caja. Los cambios manuales requieren motivo en la interfaz.
+  Los registros de auditoría, ajustes, cierres e instantáneas son de solo lectura.
+- En Cierre de caja, **Ver movimientos protegidos** muestra las copias guardadas.
+  La migración v6 no puede reconstruir qué incluían los cierres de versiones
+  anteriores: si ya hay cierres, protege conservadoramente los movimientos
+  existentes vinculándolos al último cierre y marca las copias como capturadas
+  durante la actualización. La interfaz explica esa limitación. No cambia saldos.
+- La auditoría empieza al activar esta versión; no reconstruye cambios anteriores.
+  Es una protección local de la aplicación, sin identificación de autor por cuenta
+  ni garantía frente a manipulación externa del archivo de base de datos.
 
 ### Plataformas y validación
 
@@ -228,16 +347,41 @@ implementación web, regénéralos:
 dart run sqflite_common_ffi_web:setup --force
 ```
 
-Para ejecutar en Chrome utiliza siempre el mismo puerto:
+El archivo `web_dev_config.yaml` fija el servidor de desarrollo en
+`http://localhost:7357`. Flutter lo utiliza desde la carpeta interna del proyecto,
+tanto al ejecutar desde terminal como al iniciar desde un IDE, sin repetir el
+puerto en cada ejecución (requiere Flutter 3.38 o posterior).
 
 ```bash
-flutter run -d chrome --web-port=7357
+flutter run -d chrome
+```
+
+Para usar tu perfil habitual del navegador, inicia el servidor y abre manualmente
+`http://localhost:7357` en ese mismo perfil:
+
+```bash
+flutter run -d web-server
 ```
 
 El almacenamiento está ligado al origen (protocolo, host y puerto) y al perfil
 del navegador. Recargar conserva los datos; cambiar de puerto o borrar los datos
 del sitio utiliza un almacenamiento distinto o elimina el existente. La base
 web y la del teléfono son independientes: no hay sincronización entre ellas.
+Cambiar de puerto u origen no traslada los datos existentes al nuevo. Si los
+datos permanecen en el navegador, puedes volver al origen anterior para verlos.
+El perfil de Chrome de depuración también depende de la caché de herramientas;
+para pruebas de persistencia entre sesiones usa el servidor web y el mismo perfil
+habitual. Borrar datos del sitio, usar modo privado, borrar ese perfil o perder el
+equipo puede eliminar la base local. El puerto fijo no sustituye un respaldo.
+
+En Android e iOS, `caja_segura.db` se guarda en el almacenamiento local de la app
+mediante `getDatabasesPath()`. Cerrar la app o reiniciar el teléfono no borra la
+base. Una actualización normal mantiene los datos si conserva la identidad de la
+app y sus migraciones funcionan correctamente. Desinstalar, borrar los datos de
+la aplicación (Android), restaurar el teléfono o borrar el emulador puede eliminar
+la base. Los respaldos del sistema dependen de su configuración; la app no tiene
+todavía exportación/restauración propia ni sincronización entre dispositivos.
+
 La implementación web está marcada como experimental por su mantenedor:
 [documentación de sqflite_common_ffi_web](https://pub.dev/packages/sqflite_common_ffi_web).
 

@@ -5,6 +5,7 @@ import '../../data/repositorios/categoria_repositorio.dart';
 import '../../domain/modelos/categoria.dart';
 import '../providers/categoria_provider.dart';
 import 'categoria_form_screen.dart';
+import '../tema/caja_estilo.dart';
 
 class CategoriasScreen extends ConsumerWidget {
   const CategoriasScreen({super.key});
@@ -111,58 +112,95 @@ class CategoriasScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Categorías')),
-      body: categorias.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) =>
-            Center(child: Text('Error al cargar categorías: $error')),
-        data: (lista) {
-          if (lista.isEmpty) {
-            return const Center(child: Text('Todavía no hay categorías'));
-          }
+      body: SuperficieCaja(
+        child: categorias.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) =>
+              Center(child: Text('Error al cargar categorías: $error')),
+          data: (lista) {
+            if (lista.isEmpty) {
+              return const Center(child: Text('Todavía no hay categorías'));
+            }
 
-          return ListView.builder(
-            itemCount: lista.length,
-            itemBuilder: (context, index) {
-              final categoria = lista[index];
-
-              return ListTile(
-                title: Text(categoria.nombre),
-                subtitle: Text(categoria.archivada ? 'Archivada' : 'Activa'),
-                leading: Icon(
-                  categoria.archivada
-                      ? Icons.archive_outlined
-                      : Icons.category_outlined,
-                ),
-                onTap: () => _abrirFormulario(context, categoria: categoria),
-                trailing: PopupMenuButton<String>(
-                  onSelected: (accion) {
-                    if (accion == 'editar') {
-                      _abrirFormulario(context, categoria: categoria);
-                    } else if (accion == 'archivar') {
-                      _archivar(context, ref, categoria);
-                    } else if (accion == 'eliminar') {
-                      _eliminar(context, ref, categoria);
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(value: 'editar', child: Text('Editar')),
-                    if (!categoria.archivada)
-                      const PopupMenuItem(
-                        value: 'archivar',
-                        child: Text('Archivar'),
-                      ),
-                    const PopupMenuItem(
-                      value: 'eliminar',
-                      child: Text('Eliminar'),
+            return ListView.separated(
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 100),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemCount: lista.length + 1,
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const IconoCaja(
+                          Icons.grid_view_rounded,
+                          oscuro: true,
+                          tamano: 54,
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          'Un lugar para\ncada movimiento.',
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '${lista.where((c) => !c.archivada).length} categorías activas · Organiza tus ingresos y gastos.',
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
+                  );
+                }
+                final categoria = lista[index - 1];
+
+                return Card(
+                  child: ListTile(
+                    title: Text(categoria.nombre),
+                    subtitle: Text(
+                      categoria.archivada ? 'Archivada' : 'Activa',
+                    ),
+                    leading: IconoCaja(
+                      categoria.archivada
+                          ? Icons.archive_outlined
+                          : Icons.category_outlined,
+                    ),
+                    onTap: () =>
+                        _abrirFormulario(context, categoria: categoria),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (accion) {
+                        if (accion == 'editar') {
+                          _abrirFormulario(context, categoria: categoria);
+                        } else if (accion == 'archivar') {
+                          _archivar(context, ref, categoria);
+                        } else if (accion == 'eliminar') {
+                          _eliminar(context, ref, categoria);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'editar',
+                          child: Text('Editar'),
+                        ),
+                        if (!categoria.archivada)
+                          const PopupMenuItem(
+                            value: 'archivar',
+                            child: Text('Archivar'),
+                          ),
+                        const PopupMenuItem(
+                          value: 'eliminar',
+                          child: Text('Eliminar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'crear-categoria',
         onPressed: () => _abrirFormulario(context),
         icon: const Icon(Icons.add),
         label: const Text('Nueva categoría'),

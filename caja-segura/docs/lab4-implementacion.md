@@ -5,7 +5,7 @@
 1. `navegacion_provider.dart`: guarda el índice de la pestaña en un Notifier.
 2. `principal_screen.dart`: muestra las pantallas en IndexedStack. Al cambiar de pestaña los widgets siguen montados y conservan su scroll. Ajustes muestra Próximamente.
 3. `main.dart`: abre PrincipalScreen. En Caja, Ver historial cambia el provider; en el historial vacío, Ir a mi caja hace lo mismo.
-4. `historial_provider.dart`: FiltroHistorial contiene campos final (tipo y ámbito). Su Notifier reemplaza el objeto; historialProvider usa ref.watch para consultar de nuevo cuando cambia. Los resultados se filtran en Dart después de leer SQLite. Los totales representan los movimientos del filtro activo.
+4. `historial_provider.dart`: FiltroHistorial contiene campos final (tipo y ámbito). Su Notifier reemplaza el objeto; historialProvider carga SQLite y el provider síncrono historialFiltradoProvider filtra sus datos en memoria. Cambiar filtros no consulta SQLite ni sustituye los controles por un indicador de carga. Las escrituras y Reintentar invalidan historialProvider. Los totales representan los movimientos del filtro activo.
 5. `historial_screen.dart`: conserva los controles existentes y los estados cargando, error con Reintentar, vacío y datos. Deslizar a la izquierda ejecuta confirmDismiss: primero borra en SQLite, después permite quitar la fila. Si falla, muestra un mensaje y la fila permanece. onDismissed invalida la lista. Deshacer registra el objeto original y vuelve a consultar.
 6. `movimiento_repositorio.dart`: elimina por ID con un parámetro SQL. No cambia el saldo de caja.
 7. `test/`: pruebas de filtros y vacío, navegación, borrar/deshacer, fallo al borrar y persistencia tras cerrar/reabrir SQLite.

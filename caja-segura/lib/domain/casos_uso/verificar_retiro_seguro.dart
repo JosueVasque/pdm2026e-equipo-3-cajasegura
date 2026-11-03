@@ -16,8 +16,11 @@ class ResultadoRetiro {
 
 class VerificarRetiroSeguro {
   ResultadoRetiro call(Caja caja, double monto) {
-    final restante = caja.efectivoTotal - monto;
-    final seguro = monto > 0 && restante >= caja.reservaInsumos;
+    final restante = monto.isFinite
+        ? ((caja.efectivoTotal * 100).round() - (monto * 100).round()) / 100
+        : caja.efectivoTotal;
+    final seguro =
+        monto.isFinite && monto >= 0.01 && restante >= caja.reservaInsumos;
 
     return ResultadoRetiro(
       esSeguro: seguro,
