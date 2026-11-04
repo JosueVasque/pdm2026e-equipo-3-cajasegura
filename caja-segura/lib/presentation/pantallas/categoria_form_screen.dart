@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/modelos/categoria.dart';
 import '../providers/categoria_provider.dart';
+import '../tema/caja_estilo.dart';
 
 class CategoriaFormScreen extends ConsumerStatefulWidget {
   const CategoriaFormScreen({super.key, this.categoria});
@@ -72,42 +73,65 @@ class _CategoriaFormScreenState extends ConsumerState<CategoriaFormScreen> {
       appBar: AppBar(
         title: Text(_esEdicion ? 'Editar categoría' : 'Nueva categoría'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _nombreController,
-                autofocus: true,
-                maxLength: 60,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre de categoría',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.category_outlined),
-                ),
-                validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
-                    return 'Ingresa el nombre de la categoría';
-                  }
-                  return null;
-                },
+      body: SuperficieCaja(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconoCaja(
+                      Icons.sell_outlined,
+                      oscuro: true,
+                      tamano: 56,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    _esEdicion
+                        ? 'Un nombre más claro.'
+                        : 'Organiza a tu manera.',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Dale un nombre que te ayude a reconocer tus movimientos.',
+                  ),
+                  const SizedBox(height: 28),
+                  TextFormField(
+                    controller: _nombreController,
+                    autofocus: true,
+                    maxLength: 60,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre de categoría',
+                      prefixIcon: Icon(Icons.category_outlined),
+                    ),
+                    validator: (valor) {
+                      if (valor == null || valor.trim().isEmpty) {
+                        return 'Ingresa el nombre de la categoría';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _guardando ? null : _guardar,
+                    icon: const Icon(Icons.save),
+                    label: Text(
+                      _guardando
+                          ? 'Guardando...'
+                          : _esEdicion
+                          ? 'Guardar cambios'
+                          : 'Crear categoría',
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _guardando ? null : _guardar,
-                icon: const Icon(Icons.save),
-                label: Text(
-                  _guardando
-                      ? 'Guardando...'
-                      : _esEdicion
-                      ? 'Guardar cambios'
-                      : 'Crear categoría',
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

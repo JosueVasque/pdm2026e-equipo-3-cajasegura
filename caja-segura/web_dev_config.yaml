@@ -1,0 +1,4 @@
+# Mantener el mismo origen para reutilizar la base IndexedDB durante desarrollo.
+server:
+  host: localhost
+  port: 7357

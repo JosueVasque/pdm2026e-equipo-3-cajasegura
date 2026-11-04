@@ -41,7 +41,7 @@ void main() {
       (await movimientos.obtenerHistorial()).any((m) => m.id == original.id),
       isFalse,
     );
-    await movimientos.registrarMovimiento(original);
+    await movimientos.restaurarMovimiento(original);
     await base.cerrar();
     base = BaseDatosLocal(factory: databaseFactoryFfi, ruta: ruta);
     movimientos = MovimientoRepositorio(baseDatos: base);

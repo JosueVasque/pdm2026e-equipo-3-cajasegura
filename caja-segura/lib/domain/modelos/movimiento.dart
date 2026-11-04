@@ -10,6 +10,9 @@ class Movimiento {
   final AmbitoMovimiento ambito;
   final DateTime fecha;
   final int? categoriaId;
+  final int impactoCajaCentavos;
+  final bool esRetiro;
+  final bool conciliado;
 
   const Movimiento({
     required this.id,
@@ -19,6 +22,9 @@ class Movimiento {
     required this.ambito,
     required this.fecha,
     this.categoriaId,
+    this.impactoCajaCentavos = 0,
+    this.esRetiro = false,
+    this.conciliado = false,
   });
 
   bool get esIngreso => tipo == TipoMovimiento.ingreso;

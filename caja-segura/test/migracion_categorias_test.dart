@@ -24,7 +24,7 @@ void main() {
     await directorio.delete(recursive: true);
   });
 
-  test('migra de v1 a v3 conservando caja y movimientos', () async {
+  test('migra de v1 a v6 conservando caja y movimientos', () async {
     // Simular una instalación antigua con esquema versión 1.
     final antigua = await databaseFactoryFfi.openDatabase(
       ruta,
@@ -81,7 +81,7 @@ void main() {
       final db = await baseDatos.database;
 
       final version = await db.getVersion();
-      expect(version, 3);
+      expect(version, 6);
 
       final caja = await db.query('caja');
       expect(caja, hasLength(1));
@@ -93,6 +93,7 @@ void main() {
       expect(movimientos.first['id'], 'mov-antiguo-1');
       expect(movimientos.first['descripcion'], 'Venta anterior');
       expect(movimientos.first['categoria_id'], isNull);
+      expect(movimientos.first['impacto_caja_centavos'], 0);
 
       final columnas = await db.rawQuery('PRAGMA table_info(movimientos)');
       expect(

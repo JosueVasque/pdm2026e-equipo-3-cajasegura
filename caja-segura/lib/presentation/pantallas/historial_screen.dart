@@ -3,13 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/modelos/movimiento.dart';
 import '../providers/historial_provider.dart';
 import '../providers/navegacion_provider.dart';
+import '../providers/caja_provider.dart';
+import '../providers/categoria_provider.dart';
+import 'movimiento_form_screen.dart';
+import '../tema/caja_estilo.dart';
+import 'frecuentes_screen.dart';
+import '../widgets/filtro_fechas_historial.dart';
+import 'movimiento_conciliado_screen.dart';
+import 'trazabilidad_screen.dart';
+import '../providers/trazabilidad_provider.dart';
+import '../../domain/modelos/trazabilidad.dart';
 
 enum _FiltroTipo { todos, ingresos, gastos }
 
 enum _FiltroAmbito { todos, empresa, personal }
 
-const _colorEmpresa = Colors.indigo;
-const _colorPersonal = Colors.deepOrange;
+const _colorEmpresa = CajaEstilo.verde;
+const _colorPersonal = CajaEstilo.gris;
 
 class HistorialScreen extends ConsumerStatefulWidget {
   const HistorialScreen({super.key});
@@ -32,12 +42,15 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
         null => _FiltroAmbito.todos,
       };
   void _cambiar({_FiltroTipo? tipo, _FiltroAmbito? ambito}) {
+    final actual = ref.read(filtroHistorialProvider);
     final t = tipo ?? _filtroTipo;
     final a = ambito ?? _filtroAmbito;
     ref
         .read(filtroHistorialProvider.notifier)
         .cambiar(
           FiltroHistorial(
+            periodo: actual.periodo,
+            personalizado: actual.personalizado,
             tipo: t == _FiltroTipo.todos
                 ? null
                 : TipoMovimiento.values[t.index - 1],
@@ -54,6 +67,14 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
     try {
       // confirmDismiss espera a SQLite: si falla, la fila sigue visible.
       await repositorio.eliminarMovimiento(movimiento.id);
+      ref.invalidate(cajaProvider);
+      ref.invalidate(cambiosProvider);
+    } on MovimientoConciliadoException catch (e) {
+      if (mounted) {
+        ref.invalidate(historialProvider);
+        messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+      return false;
     } catch (_) {
       if (mounted) {
         messenger.showSnackBar(
@@ -70,8 +91,12 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
           label: 'Deshacer',
           onPressed: () async {
             try {
-              await repositorio.registrarMovimiento(movimiento);
-              if (mounted) ref.invalidate(historialProvider);
+              await repositorio.restaurarMovimiento(movimiento);
+              if (mounted) {
+                ref.invalidate(historialProvider);
+                ref.invalidate(cajaProvider);
+                ref.invalidate(cambiosProvider);
+              }
             } catch (_) {
               messenger.showSnackBar(
                 const SnackBar(
@@ -106,131 +131,278 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(filtroHistorialProvider);
-    final historial = ref.watch(historialProvider);
+    final filtro = ref.watch(filtroHistorialProvider);
+    final historial = ref.watch(historialFiltradoProvider);
+    final categorias = ref.watch(categoriasProvider).asData?.value ?? [];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Historial')),
+      appBar: AppBar(
+        title: const Text('Historial'),
+        actions: [
+          IconButton(
+            tooltip: 'Trazabilidad',
+            icon: const Icon(Icons.history_rounded, color: CajaEstilo.menta),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TrazabilidadScreen()),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Movimientos frecuentes',
+            icon: const Icon(Icons.bolt_outlined, color: CajaEstilo.menta),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FrecuentesScreen()),
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'registrar-movimiento',
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MovimientoFormScreen()),
+        ),
+        icon: const Icon(Icons.add),
+        label: const Text('Registrar movimiento'),
+      ),
       // Los 4 estados: cargando, error (con Reintentar), vacío y datos.
-      body: historial.when(
-        // Al reintentar, mostrar otra vez el indicador de carga.
-        skipLoadingOnRefresh: false,
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => _EstadoError(onReintentar: _reintentar),
-        data: (movimientos) {
-          if (movimientos.isEmpty &&
-              _filtroTipo == _FiltroTipo.todos &&
-              _filtroAmbito == _FiltroAmbito.todos) {
-            return const _EstadoVacio();
-          }
+      body: SuperficieCaja(
+        child: historial.when(
+          // Al reintentar, mostrar otra vez el indicador de carga.
+          skipLoadingOnRefresh: false,
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, _) => _EstadoError(onReintentar: _reintentar),
+          data: (movimientos) {
+            if (movimientos.isEmpty && !filtro.activo) {
+              return const _EstadoVacio();
+            }
 
-          final porAmbito = movimientos;
-          final lista = movimientos;
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _TarjetaResumen(
-                        titulo: 'Ingresos$_etiquetaAmbito',
-                        monto: _total(porAmbito, true),
-                        color: Colors.green,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _TarjetaResumen(
-                        titulo: 'Gastos$_etiquetaAmbito',
-                        monto: _total(porAmbito, false),
-                        color: Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Wrap(
-                  spacing: 8,
-                  children: [
-                    ChoiceChip(
-                      label: const Text('Todo'),
-                      selected: _filtroAmbito == _FiltroAmbito.todos,
-                      onSelected: (_) => _cambiar(ambito: _FiltroAmbito.todos),
-                    ),
-                    ChoiceChip(
-                      avatar: const Icon(Icons.storefront, size: 18),
-                      label: const Text('Empresa'),
-                      selected: _filtroAmbito == _FiltroAmbito.empresa,
-                      onSelected: (_) =>
-                          _cambiar(ambito: _FiltroAmbito.empresa),
-                    ),
-                    ChoiceChip(
-                      avatar: const Icon(Icons.person, size: 18),
-                      label: const Text('Personal'),
-                      selected: _filtroAmbito == _FiltroAmbito.personal,
-                      onSelected: (_) =>
-                          _cambiar(ambito: _FiltroAmbito.personal),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: SegmentedButton<_FiltroTipo>(
-                  segments: const [
-                    ButtonSegment(
-                      value: _FiltroTipo.todos,
-                      label: Text('Todos'),
-                    ),
-                    ButtonSegment(
-                      value: _FiltroTipo.ingresos,
-                      label: Text('Ingresos'),
-                    ),
-                    ButtonSegment(
-                      value: _FiltroTipo.gastos,
-                      label: Text('Gastos'),
-                    ),
-                  ],
-                  selected: {_filtroTipo},
-                  onSelectionChanged: (s) => _cambiar(tipo: s.first),
-                ),
-              ),
-              Expanded(
-                child: lista.isEmpty
-                    ? const Center(
-                        child: Text('No hay movimientos para mostrar'),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        itemCount: lista.length,
-                        separatorBuilder: (_, _) => const Divider(height: 1),
-                        itemBuilder: (_, i) => Dismissible(
-                          key: ValueKey(lista[i].id),
-                          direction: DismissDirection.endToStart,
-                          background: Container(
-                            color: Colors.red,
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.all(16),
-                            child: const Icon(
-                              Icons.delete,
-                              color: Colors.white,
+            final porAmbito = movimientos;
+            final lista = movimientos;
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(24, 26, 24, 0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Cada movimiento cuenta.',
+                            style: TextStyle(
+                              fontSize: 23,
+                              letterSpacing: -0.6,
+                              fontWeight: FontWeight.w700,
+                              color: CajaEstilo.tinta,
                             ),
                           ),
-                          confirmDismiss: (_) => _borrar(lista[i]),
-                          onDismissed: (_) => ref.invalidate(historialProvider),
-                          child: _FilaMovimiento(lista[i]),
                         ),
                       ),
-              ),
-            ],
-          );
-        },
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _TarjetaResumen(
+                                titulo: 'Ingresos$_etiquetaAmbito',
+                                monto: _total(porAmbito, true),
+                                color: CajaEstilo.verde,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _TarjetaResumen(
+                                titulo: 'Gastos$_etiquetaAmbito',
+                                monto: _total(porAmbito, false),
+                                color: CajaEstilo.peligro,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const FiltroFechasHistorial(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Wrap(
+                          spacing: 8,
+                          children: [
+                            ChoiceChip(
+                              labelStyle: TextStyle(
+                                fontFamily: 'Roboto',
+                                color: _filtroAmbito == _FiltroAmbito.todos
+                                    ? Colors.white
+                                    : CajaEstilo.gris,
+                              ),
+                              label: const Text('Todo'),
+                              selected: _filtroAmbito == _FiltroAmbito.todos,
+                              onSelected: (_) =>
+                                  _cambiar(ambito: _FiltroAmbito.todos),
+                            ),
+                            ChoiceChip(
+                              labelStyle: TextStyle(
+                                fontFamily: 'Roboto',
+                                color: _filtroAmbito == _FiltroAmbito.empresa
+                                    ? Colors.white
+                                    : CajaEstilo.gris,
+                              ),
+                              avatarBorder: const CircleBorder(),
+                              avatar: Icon(
+                                Icons.storefront,
+                                size: 18,
+                                color: _filtroAmbito == _FiltroAmbito.empresa
+                                    ? CajaEstilo.menta
+                                    : CajaEstilo.verde,
+                              ),
+                              label: const Text('Empresa'),
+                              selected: _filtroAmbito == _FiltroAmbito.empresa,
+                              onSelected: (_) =>
+                                  _cambiar(ambito: _FiltroAmbito.empresa),
+                            ),
+                            ChoiceChip(
+                              labelStyle: TextStyle(
+                                fontFamily: 'Roboto',
+                                color: _filtroAmbito == _FiltroAmbito.personal
+                                    ? Colors.white
+                                    : CajaEstilo.gris,
+                              ),
+                              avatar: Icon(
+                                Icons.person,
+                                size: 18,
+                                color: _filtroAmbito == _FiltroAmbito.personal
+                                    ? CajaEstilo.menta
+                                    : CajaEstilo.verde,
+                              ),
+                              label: const Text('Personal'),
+                              selected: _filtroAmbito == _FiltroAmbito.personal,
+                              onSelected: (_) =>
+                                  _cambiar(ambito: _FiltroAmbito.personal),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: SegmentedButton<_FiltroTipo>(
+                          showSelectedIcon: false,
+                          segments: const [
+                            ButtonSegment(
+                              value: _FiltroTipo.todos,
+                              label: Text('Todos'),
+                            ),
+                            ButtonSegment(
+                              value: _FiltroTipo.ingresos,
+                              label: Text('Ingresos'),
+                            ),
+                            ButtonSegment(
+                              value: _FiltroTipo.gastos,
+                              label: Text('Gastos'),
+                            ),
+                          ],
+                          selected: {_filtroTipo},
+                          onSelectionChanged: (s) => _cambiar(tipo: s.first),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(24, 16, 24, 14),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Movimientos',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: CajaEstilo.tinta,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Flexible(
+                              child: Text(
+                                'Desliza para borrar',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: CajaEstilo.gris,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                lista.isEmpty
+                    ? const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                          child: Text('No hay movimientos para mostrar'),
+                        ),
+                      )
+                    : SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                        sliver: SliverList.separated(
+                          itemCount: lista.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 8),
+                          itemBuilder: (_, i) => Dismissible(
+                            key: ValueKey(lista[i].id),
+                            direction: lista[i].conciliado
+                                ? DismissDirection.none
+                                : DismissDirection.endToStart,
+                            background: Container(
+                              color: Colors.red,
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.all(16),
+                              child: const Icon(
+                                Icons.delete,
+                                color: Colors.white,
+                              ),
+                            ),
+                            confirmDismiss: (_) => _borrar(lista[i]),
+                            onDismissed: (_) =>
+                                ref.invalidate(historialProvider),
+                            child: Card(
+                              child: _FilaMovimiento(
+                                lista[i],
+                                categoria: lista[i].categoriaId == null
+                                    ? 'Sin categoría'
+                                    : categorias
+                                              .where(
+                                                (c) =>
+                                                    c.id ==
+                                                    lista[i].categoriaId,
+                                              )
+                                              .map(
+                                                (c) =>
+                                                    '${c.nombre}${c.archivada ? ' (archivada)' : ''}',
+                                              )
+                                              .firstOrNull ??
+                                          'Categoría no disponible',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => lista[i].conciliado
+                                        ? MovimientoConciliadoScreen(
+                                            movimiento: lista[i],
+                                          )
+                                        : MovimientoFormScreen(
+                                            movimiento: lista[i],
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -308,19 +480,32 @@ class _TarjetaResumen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: color == CajaEstilo.verde ? const Color(0xFFDDF9EA) : Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Icon(
+              color == CajaEstilo.verde
+                  ? Icons.south_west_rounded
+                  : Icons.north_east_rounded,
+              size: 21,
+              color: color,
+            ),
+            const SizedBox(height: 14),
             Text(titulo, style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 4),
-            Text(
-              'Q${monto.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: color,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Q${monto.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: CajaEstilo.tinta,
+                ),
               ),
             ),
           ],
@@ -371,8 +556,14 @@ class _Distintivo extends StatelessWidget {
 
 class _FilaMovimiento extends StatelessWidget {
   final Movimiento movimiento;
+  final String categoria;
+  final VoidCallback onTap;
 
-  const _FilaMovimiento(this.movimiento);
+  const _FilaMovimiento(
+    this.movimiento, {
+    required this.categoria,
+    required this.onTap,
+  });
 
   String _fecha(DateTime f) {
     final d = f.day.toString().padLeft(2, '0');
@@ -383,10 +574,11 @@ class _FilaMovimiento extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final esIngreso = movimiento.esIngreso;
-    final color = esIngreso ? Colors.green : Colors.red;
+    final color = esIngreso ? CajaEstilo.verde : CajaEstilo.peligro;
     final signo = esIngreso ? '+' : '-';
 
     return ListTile(
+      onTap: onTap,
       leading: CircleAvatar(
         backgroundColor: color.withValues(alpha: 0.12),
         child: Icon(
@@ -397,11 +589,29 @@ class _FilaMovimiento extends StatelessWidget {
       title: Text(movimiento.descripcion),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 4),
-        child: Row(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 4,
           children: [
             _Distintivo(esEmpresa: movimiento.esEmpresa),
-            const SizedBox(width: 8),
             Text(_fecha(movimiento.fecha)),
+            Text(categoria),
+            if (movimiento.conciliado)
+              const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock_outline, size: 12),
+                  SizedBox(width: 3),
+                  Flexible(
+                    child: Text(
+                      'Conciliado',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
           ],
         ),
       ),

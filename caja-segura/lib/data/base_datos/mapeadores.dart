@@ -38,6 +38,8 @@ Map<String, Object?> movimientoAFila(Movimiento movimiento) {
     'ambito': movimiento.ambito.name,
     'fecha': movimiento.fecha.millisecondsSinceEpoch,
     'categoria_id': movimiento.categoriaId,
+    'impacto_caja_centavos': movimiento.impactoCajaCentavos,
+    'es_retiro': movimiento.esRetiro ? 1 : 0,
   };
 }
 
@@ -49,4 +51,7 @@ Movimiento movimientoDesdeFila(Map<String, Object?> fila) => Movimiento(
   ambito: AmbitoMovimiento.values.byName(fila['ambito'] as String),
   fecha: DateTime.fromMillisecondsSinceEpoch(fila['fecha'] as int),
   categoriaId: fila['categoria_id'] as int?,
+  impactoCajaCentavos: fila['impacto_caja_centavos'] as int? ?? 0,
+  esRetiro: fila['es_retiro'] == 1,
+  conciliado: fila['conciliado'] == 1,
 );
