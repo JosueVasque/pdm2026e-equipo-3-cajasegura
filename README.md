@@ -128,13 +128,6 @@ El código Flutter está en `caja-segura/lib/`, con las carpetas `presentation/`
 Consulta la [estructura y documentación técnica de la app](caja-segura/README.md#arquitectura)
 para conocer los componentes, la persistencia, las migraciones y sus limitaciones.
 
-## Decisiones y pruebas con usuarios
-
-- [ADR 0001: persistencia local con SQLite](docs/adr/0001-persistencia-local-sqlite.md).
-- [ADR 0002: navegación y filtros con Riverpod](docs/adr/0002-navegacion-y-filtros-riverpod.md).
-- [Pruebas con usuarios y seguimiento de correcciones](docs/usuarios.md).
-  Incluye tres hallazgos reportados por el equipo, sus PR correctivos y la validación posterior pendiente.
-
 ## Flujo de contribución
 
 Nadie trabaja directamente en `main`. El flujo es:
