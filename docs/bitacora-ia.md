@@ -17,6 +17,25 @@ qué especificaste, qué revisaste y qué rechazaste.
 
 ---
 
+## 2026-11-04 · Documentación de decisiones y pruebas con usuarios
+
+- **Herramienta:** Codex.
+- **Especificación:** documentar al menos dos decisiones en `docs/adr/` y crear
+  `docs/usuarios.md` con tareas, fallos y PR de corrección.
+- **Resultado:** dos ADR sobre SQLite y navegación/filtros con Riverpod;
+  registro de usuarios con guion, seguimiento de hallazgos y enlaces desde el README.
+- **Aceptado:** describir decisiones implementadas y separar evidencia técnica de
+  observaciones de usuarios.
+- **Rechazado / corregido:** no inventar sesiones, resultados ni PR correctivos;
+  tras la aclaración del equipo, se registraron tres hallazgos: filtros por fecha,
+  asignación de categorías y parpadeo al filtrar. Se vincularon al PR #25 mediante
+  el historial local, sin atribuir participantes ni una validación posterior no reportada.
+- **Verificación:** revisión del código, historial local, enlaces relativos y
+  `git diff --check`. No se ejecutó la app ni se realizaron pruebas con usuarios.
+- **Commit / PR:** pendiente; cambios locales sin commit ni publicación.
+
+---
+
 ## 2026-10-18 · @JosueVasque (pantalla de la pareja @FMarvin y @JohanRRod) — estados de Caja del Negocio
 
 - **Herramienta:** Claude.

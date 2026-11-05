@@ -63,13 +63,12 @@ class BaseDatosLocal {
             'CREATE INDEX movimientos_fecha ON movimientos (fecha DESC)',
           );
           await db.execute('''
-  CREATE TABLE categorias (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL COLLATE NOCASE UNIQUE,
-    archivada INTEGER NOT NULL DEFAULT 0
-      CHECK (archivada IN (0, 1))
-  )
-''');
+            CREATE TABLE categorias (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              nombre TEXT NOT NULL COLLATE NOCASE UNIQUE,
+              archivada INTEGER NOT NULL DEFAULT 0 CHECK (archivada IN (0, 1))
+            )
+          ''');
           await crearTablasOperaciones(db);
           await cargarDatosIniciales(db);
           await db.execute(
@@ -86,21 +85,21 @@ class BaseDatosLocal {
           }
           if (versionAnterior < 2) {
             await db.execute('''
-      CREATE TABLE categorias (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT NOT NULL COLLATE NOCASE UNIQUE,
-        archivada INTEGER NOT NULL DEFAULT 0
-          CHECK (archivada IN (0, 1))
-      )
-    ''');
+              CREATE TABLE categorias (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                archivada INTEGER NOT NULL DEFAULT 0
+                  CHECK (archivada IN (0, 1))
+              )
+            ''');
           }
 
           if (versionAnterior < 3) {
             await db.execute('''
-      ALTER TABLE movimientos
-      ADD COLUMN categoria_id INTEGER
-      REFERENCES categorias(id) ON DELETE RESTRICT
-    ''');
+              ALTER TABLE movimientos
+              ADD COLUMN categoria_id INTEGER
+              REFERENCES categorias(id) ON DELETE RESTRICT
+            ''');
           }
           if (versionAnterior < 5) {
             await db.execute(
