@@ -1,3 +1,5 @@
+import 'package:device_preview/device_preview.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'presentation/pantallas/principal_screen.dart';
@@ -7,7 +9,13 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   // Riverpod 3 reintenta solo los providers que fallan; eso esconde el estado
   // de error y el botón Reintentar. Se desactiva para toda la app.
-  runApp(ProviderScope(retry: (_, _) => null, child: const MiApp()));
+  runApp(
+    DevicePreview(
+      enabled: kDebugMode,
+      builder: (_) =>
+          ProviderScope(retry: (_, _) => null, child: const MiApp()),
+    ),
+  );
 }
 
 class MiApp extends StatelessWidget {
@@ -19,12 +27,16 @@ class MiApp extends StatelessWidget {
       title: 'Caja Segura',
       debugShowCheckedModeBanner: false,
       theme: CajaEstilo.tema,
-      builder: (context, child) => ColoredBox(
-        color: const Color(0xFFE3E9E5),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
-            child: child,
+      locale: DevicePreview.locale(context),
+      builder: (context, child) => DevicePreview.appBuilder(
+        context,
+        ColoredBox(
+          color: const Color(0xFFE3E9E5),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: child,
+            ),
           ),
         ),
       ),

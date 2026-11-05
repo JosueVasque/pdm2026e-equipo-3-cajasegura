@@ -28,17 +28,31 @@ Inicio: Maria abre la app y ve su caja disponible → acción: ingresa el
 monto que quiere retirar como sueldo → resultado: la app confirma si el 
 retiro es seguro y protege la reserva de insumos.
 
-### Sí entra al MVP
-1. Ver caja disponible y reserva protegida para insumos.
-2. Ingresar el monto a retirar como sueldo.
-3. Confirmación de si el retiro es seguro / impacto en caja.
+### Funciones implementadas
+
+1. Consultar y editar efectivo y reserva de insumos, con alertas de reserva insuficiente.
+2. Simular y confirmar retiros de sueldo, verificando el saldo vigente y protegiendo la reserva.
+3. Registrar movimientos de empresa o personales; consultar el historial con filtros de fecha, tipo y ámbito.
+4. Administrar categorías y plantillas de movimientos frecuentes.
+5. Consultar reportes por período, ámbito y categoría, incluido el resumen de retiros de sueldo.
+6. Realizar cierres de caja con efectivo contado, diferencias e historial de cierres.
+7. Corregir movimientos no conciliados con motivo; proteger los conciliados y registrar aclaraciones o ajustes vinculados.
+8. Conservar datos localmente en SQLite y consultar la trazabilidad de operaciones.
+
+La navegación principal incluye **Inicio, Historial, Categorías y Reportes**.
 
 ### No entra todavía
 1. Pantalla independiente de "Retiro exitoso" (la confirmación ya muestra un aviso).
 2. Pantalla de ajuste ante riesgo de descapitalización.
 3. Sincronización con un servidor o base de datos remota.
 
-La persistencia local con SQLite ya está integrada para la caja y el historial.
+1. Pantalla independiente de "Retiro exitoso"; la confirmación ya muestra un aviso.
+2. Pantalla independiente de ajuste ante riesgo de descapitalización.
+3. Sincronización con un servidor o entre dispositivos.
+4. Exportación y restauración de respaldos desde la app.
+
+La persistencia local está integrada en Android/iOS y en la versión web. Los datos
+se guardan por instalación o por origen y perfil del navegador; no se sincronizan.
 
 ### Suposición más riesgosa
 
@@ -106,59 +120,49 @@ Los roles rotan semanalmente. Todos los integrantes programan, independientement
 
 ## Arquitectura
 
-### Contexto
+La app organiza caja, retiros, historial, categorías, reportes, frecuentes,
+cierres y trazabilidad en tres capas:
 
-El proyecto necesita una estructura que permita escalar el MVP actual (3 
-pantallas: Caja del Negocio, Retiro Personal, Impacto en Caja) hacia las 
-funciones pendientes (Retiro Exitoso, Ajuste por riesgo y sincronización remota)
-sin tener que reescribir código ya construido.
+1. **Presentación**: pantallas, widgets, tema y providers de Riverpod. Coordina la navegación y los estados de carga, error y reintento.
+2. **Dominio**: modelos y reglas de negocio en Dart puro, como verificar retiros, evaluar la reserva y generar reportes.
+3. **Datos**: conexión y migraciones de SQLite, mapeadores y repositorios asíncronos. Las transacciones mantienen consistentes el saldo, los movimientos y la auditoría.
 
-### Decisión
-
-Se adopta **Clean Architecture** con 3 capas:
-
-1. **Presentación (Presentation)**: pantallas, widgets y estado de UI. Es la única capa que conoce Flutter/Material.
-2. **Dominio (Domain)**: reglas de negocio puras (ej. calcular si un retiro es seguro, proteger la reserva de insumos). No depende de Flutter ni de ninguna fuente de datos.
-3. **Datos (Data)**: acceso a SQLite mediante `sqflite`. Administra la conexión, el esquema, los datos iniciales y los repositorios asíncronos, sin incorporar dependencias de persistencia en el dominio.
+Las pantallas consumen repositorios mediante providers. El dominio no importa
+Flutter ni SQLite; las implementaciones de repositorios residen en `data`.
+Los imports condicionales seleccionan la conexión nativa o web.
 
 ### Estructura de carpetas
 
-```
+Las rutas siguientes parten de la carpeta de la aplicación, `caja-segura/`:
+
+```text
 lib/
+├── main.dart
 ├── presentation/
-│   ├── pantallas/
-│   │   ├── caja_negocio_screen.dart
-│   │   ├── retiro_personal_screen.dart
-│   │   ├── impacto_caja_screen.dart
-│   │   └── historial_screen.dart
-│   └── widgets/carga_datos.dart
+│   ├── pantallas/       # Inicio, retiros, historial, categorías y reportes;
+│   │                    # frecuentes, cierres, correcciones y trazabilidad
+│   ├── providers/       # Estado y acceso a repositorios con Riverpod
+│   ├── tema/            # Estilo de la aplicación
+│   └── widgets/         # Carga, importes, alertas y filtros reutilizables
 ├── domain/
-│   ├── modelos/
-│   │   ├── caja.dart
-│   │   └── movimiento.dart
-│   └── casos_uso/
-│       └── verificar_retiro_seguro.dart
+│   ├── modelos/         # Caja, movimiento, categoría, frecuente, cierre y trazabilidad
+│   └── casos_uso/       # Retiro seguro, reserva, reportes y resumen de retiros
 └── data/
-    ├── base_datos/
-    │   ├── base_datos_local.dart
-    │   ├── datos_iniciales.dart
-    │   └── mapeadores.dart
-    └── repositorios/
-        ├── caja_repositorio.dart
-        └── movimiento_repositorio.dart
+    ├── base_datos/      # Conexiones nativa/web, esquema v6, migraciones,
+    │                    # datos iniciales, mapeadores y protección de registros
+    └── repositorios/   # Caja, movimientos, categorías, frecuentes,
+                         # cierres y trazabilidad
+
+test/                    # Pruebas de reglas, SQLite, migraciones y widgets
+web/                     # Recursos web, sqlite3.wasm y sqflite_sw.js
 ```
 
-### Por qué esta decisión
+### Motivos y consecuencias
 
-- **Escalabilidad**: agregar las pantallas que quedaron fuera del MVP (Hojas 4 y 5) no debería requerir tocar la lógica de negocio ya construida.
-- **Separación de responsabilidades**: cada capa tiene una única razón para cambiar (cambia el diseño → solo `presentation`; cambia la regla de negocio → solo `domain`; cambia la fuente de datos → solo `data`).
-- **Persistencia local**: SQLite queda encapsulado en `data`; las pantallas esperan los resultados asíncronos y las reglas de negocio siguen siendo Dart puro.
-
-### Consecuencias
-
-- Mayor cantidad de archivos y carpetas desde el inicio, comparado con tener todo en un solo `main.dart`.
-- Requiere que el equipo entienda y respete los límites entre capas al programar.
-- Los widgets `Container`/`Column`/`Row` ya construidos en el prototipo se reubican dentro de `presentation/pantallas/`, sin cambios funcionales.
+- Separar reglas de negocio, interfaz y persistencia facilita sus cambios y pruebas.
+- SQLite queda encapsulado en datos; la interfaz espera operaciones asíncronas.
+- El estado de la interfaz se organiza con Riverpod y se actualiza después de las operaciones.
+- Las nuevas funciones requieren mantener los límites entre capas y agregar migraciones cuando cambia el esquema.
 
 ## Flujo de contribución
 
@@ -168,10 +172,58 @@ Nadie trabaja directamente en `main`. El flujo es:
 
 ## Cómo correr el proyecto
 
-```bash
+### Requisitos
+
+- Flutter en el `PATH`, con Dart compatible con `^3.12.2`. El archivo de dependencias resueltas actual requiere Flutter `>=3.44.0`.
+- Chrome para ejecutar la versión web; no hace falta Android Studio para esta vista previa.
+- Para Android o iOS se necesita además el entorno de desarrollo de la plataforma correspondiente; iOS requiere macOS y Xcode.
+
+Desde la raíz del repositorio, entra en la carpeta que contiene `pubspec.yaml`:
+
+```powershell
+cd caja-segura
+flutter --version
+flutter doctor
 flutter pub get
-flutter run
+flutter run -d chrome
 ```
+
+Si ya estás en la carpeta interna `caja-segura/`, omite `cd caja-segura`.
+Para un dispositivo móvil configurado, usa `flutter devices` y luego
+`flutter run -d ID_DEL_DISPOSITIVO`.
+
+Si Windows muestra **Building with plugins requires symlink support**, abre
+Configuración desde PowerShell:
+
+```powershell
+start ms-settings:developers
+```
+
+Activa **Modo de desarrollador**, acepta la confirmación y vuelve a ejecutar
+`flutter pub get` y `flutter run -d chrome`.
+
+### Vista de teléfono con Device Preview
+
+El proyecto ya incluye `device_preview: ^1.3.1` y lo integra en `lib/main.dart`.
+Se activa en modo **debug**, incluido `flutter run -d chrome`, y queda desactivado
+en profile y release. No es necesario volver a instalar el paquete.
+
+1. Ejecuta la app en Chrome. En una ventana amplia, el panel de Device Preview aparece a la derecha.
+2. En **Device → Model**, selecciona el teléfono que quieres mostrar.
+3. En **Frame visibility**, selecciona **Visible** para mostrar el marco.
+4. Usa **Orientation** para alternar entre vertical y horizontal.
+
+En ventanas estrechas, toca **Device Preview** en la barra inferior para abrir
+el panel; si está apagado, activa su interruptor. Si la app ya estaba ejecutándose
+antes del cambio en `main.dart`, detén la ejecución y vuelve a iniciarla.
+
+Esta versión incluye los controles dentro de la página de la app. La integración
+usa el widget `DevicePreview`, `DevicePreview.locale` y `DevicePreview.appBuilder`;
+las instrucciones de la versión 3.x, como `DevicePreview.enable()`, no corresponden
+a la dependencia instalada. Consulta la [documentación de Device Preview 1.3.1](https://pub.dev/packages/device_preview/versions/1.3.1).
+
+La vista previa permite revisar tamaños, orientación y apariencia de teléfono;
+las funciones nativas se deben comprobar también en un dispositivo o emulador.
 
 ## Persistencia local con SQLite
 
@@ -188,6 +240,11 @@ incrementar esa versión y agregar una migración `onUpgrade` que conserve los d
 | `caja` | Un registro con efectivo total y reserva de insumos. |
 | `movimientos` | ID, descripción, monto, tipo (ingreso/gasto), ámbito (empresa/personal) y fecha. |
 | `categorias` | Nombre único e indicador de archivo; los movimientos pueden tener una categoría opcional. |
+| `frecuentes` | Plantillas con descripción, monto, tipo, ámbito y categoría opcional; no alteran el saldo por sí solas. |
+| `cierres` | Fecha, saldo esperado, efectivo contado, reserva y explicación de cada cierre. |
+| `movimientos_conciliados` | Vínculo de movimientos con sus cierres e instantáneas de los datos protegidos. |
+| `auditoria` | Acción, fecha, motivo y valores anteriores/nuevos de los cambios registrados. |
+| `ajustes_movimiento` | Ajustes de efectivo vinculados al movimiento original, con fecha, diferencia en centavos y motivo. |
 
 Los importes se almacenan como enteros en centavos y se convierten a los modelos
 de dominio en `mapeadores.dart`. Las fechas se guardan como milisegundos desde
@@ -390,10 +447,17 @@ flutter analyze
 flutter test
 ```
 
-Las pruebas ejecutan SQLite real sobre archivos temporales para verificar la
-creación, persistencia al reabrir, integridad y ausencia de duplicados en los
-datos iniciales. También cubren carga, reintento, filtros y simulación de retiro
-en las pantallas.
+Las pruebas ejecutan SQLite real sobre archivos temporales para verificar
+creación, persistencia al reabrir, transacciones, ausencia de duplicados y
+migraciones hasta v6 sin alterar los saldos existentes. Cubren categorías,
+registro, borrado y restauración de movimientos, alertas de reserva, reportes,
+plantillas frecuentes, cierres y resumen de retiros.
+
+La cobertura de trazabilidad incluye correcciones con motivo, protección de
+movimientos conciliados, ajustes vinculados, registros inmutables y conflictos
+cuando un cierre ocurre durante una corrección. Las pruebas de widgets revisan
+navegación, formularios, estados de carga y error con reintento, filtros de
+historial y reportes, categorías y las operaciones anteriores.
 
 ## Roles (Semana )
 
