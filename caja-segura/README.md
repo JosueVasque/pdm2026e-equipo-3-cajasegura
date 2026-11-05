@@ -42,6 +42,9 @@ retiro es seguro y protege la reserva de insumos.
 La navegación principal incluye **Inicio, Historial, Categorías y Reportes**.
 
 ### No entra todavía
+1. Pantalla independiente de "Retiro exitoso" (la confirmación ya muestra un aviso).
+2. Pantalla de ajuste ante riesgo de descapitalización.
+3. Sincronización con un servidor o base de datos remota.
 
 1. Pantalla independiente de "Retiro exitoso"; la confirmación ya muestra un aviso.
 2. Pantalla independiente de ajuste ante riesgo de descapitalización.

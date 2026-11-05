@@ -37,6 +37,12 @@ class MiApp extends StatelessWidget {
               constraints: const BoxConstraints(maxWidth: 760),
               child: child,
             ),
+      builder: (context, child) => ColoredBox(
+        color: const Color(0xFFE3E9E5),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: child,
           ),
         ),
       ),
